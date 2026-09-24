@@ -4,8 +4,12 @@
 All configuration comes from environment variables (see
 .env.example) so nothing user-specific is hardcoded:
 
-    GRAVATAR_SYNC_EMAIL      Email address whose Gravatar to fetch (required)
     GRAVATAR_SYNC_USER       Local username to update (required)
+    GRAVATAR_SYNC_EMAIL      Email address whose Gravatar to fetch. Optional:
+                              if unset, falls back to the Email field
+                              AccountsService has on record for the user
+                              (e.g. set via a desktop's System Settings ->
+                              Users), and only fails if neither is available.
     GRAVATAR_SYNC_SIZE       Requested image size in pixels (default: 512)
     GRAVATAR_SYNC_STATE_DIR  Where to remember the last-applied image hash,
                               so unchanged Gravatars are a no-op
@@ -32,6 +36,8 @@ from pathlib import Path
 log = logging.getLogger("gravatar-sync")
 
 ICON_DIR = Path("/var/lib/AccountsService/icons")
+ACCOUNTS_INTERFACE = "org.freedesktop.Accounts"
+USER_INTERFACE = "org.freedesktop.Accounts.User"
 
 
 def env(name: str, default: str = "", *, required: bool = False) -> str:
@@ -62,26 +68,39 @@ def fetch_gravatar(email: str, size: str) -> bytes | None:
         raise
 
 
-def dbus_user_object_path(username: str) -> str:
+def _busctl_string(*args: str) -> str:
+    """Run a busctl call/get-property and unwrap its `s "value"` output."""
     result = subprocess.run(
-        [
-            "busctl", "--system", "call",
-            "org.freedesktop.Accounts", "/org/freedesktop/Accounts",
-            "org.freedesktop.Accounts", "FindUserByName", "s", username,
-        ],
-        check=True, capture_output=True, text=True,
-    )
+        ["busctl", "--system", *args], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    return result.split('"', 1)[1].rsplit('"', 1)[0]
+
+
+def dbus_user_object_path(username: str) -> str:
     # Output looks like: o "/org/freedesktop/Accounts/User1000"
-    return result.stdout.strip().split('"')[1]
+    return _busctl_string(
+        "call", ACCOUNTS_INTERFACE, "/org/freedesktop/Accounts",
+        ACCOUNTS_INTERFACE, "FindUserByName", "s", username,
+    )
 
 
-def set_account_icon(username: str, icon_path: Path) -> None:
-    object_path = dbus_user_object_path(username)
+def account_email(object_path: str) -> str | None:
+    """The Email field AccountsService has on record for this user, if any."""
+    try:
+        email = _busctl_string(
+            "get-property", ACCOUNTS_INTERFACE, object_path, USER_INTERFACE, "Email"
+        )
+    except subprocess.CalledProcessError:
+        return None
+    return email or None
+
+
+def set_account_icon(object_path: str, icon_path: Path) -> None:
     subprocess.run(
         [
             "busctl", "--system", "call",
-            "org.freedesktop.Accounts", object_path,
-            "org.freedesktop.Accounts.User", "SetIconFile", "s", str(icon_path),
+            ACCOUNTS_INTERFACE, object_path,
+            USER_INTERFACE, "SetIconFile", "s", str(icon_path),
         ],
         check=True,
     )
@@ -90,10 +109,25 @@ def set_account_icon(username: str, icon_path: Path) -> None:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    email = env("GRAVATAR_SYNC_EMAIL", required=True)
     username = env("GRAVATAR_SYNC_USER", required=True)
     size = env("GRAVATAR_SYNC_SIZE", "512")
     state_dir = Path(env("GRAVATAR_SYNC_STATE_DIR", "/var/lib/gravatar-sync"))
+
+    try:
+        object_path = dbus_user_object_path(username)
+    except subprocess.CalledProcessError:
+        log.error("no such AccountsService user: %s", username)
+        return 1
+
+    email = env("GRAVATAR_SYNC_EMAIL") or account_email(object_path)
+    if not email:
+        log.error(
+            "no GRAVATAR_SYNC_EMAIL set, and AccountsService has no Email on "
+            "record for %s (set one in your desktop's User Settings, or set "
+            "GRAVATAR_SYNC_EMAIL in the config)",
+            username,
+        )
+        return 1
 
     image = fetch_gravatar(email, size)
     if image is None:
@@ -109,7 +143,7 @@ def main() -> int:
     icon_path.write_bytes(image)
     icon_path.chmod(0o644)
 
-    set_account_icon(username, icon_path)
+    set_account_icon(object_path, icon_path)
 
     state_dir.mkdir(parents=True, exist_ok=True)
     state_file.write_text(digest + "\n")
