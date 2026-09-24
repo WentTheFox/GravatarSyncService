@@ -1,0 +1,21 @@
+[Unit]
+Description=Sync local account picture from Gravatar
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/gravatar-sync/config.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/gravatar-sync/config.env
+ExecStart=/usr/local/bin/gravatar-sync
+
+# Hardening. Needs root (to write AccountsService's icon dir and call it
+# over the system bus without a polkit prompt) but not much else.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/var/lib/AccountsService/icons /var/lib/gravatar-sync
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
