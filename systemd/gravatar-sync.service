@@ -15,7 +15,10 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=read-only
 ProtectSystem=strict
-ReadWritePaths=/var/lib/AccountsService/icons /var/lib/gravatar-sync
+ReadWritePaths=/var/lib/AccountsService/icons
+# Auto-creates and grants write access to /var/lib/gravatar-sync; unlike
+# ReadWritePaths this doesn't require the directory to pre-exist.
+StateDirectory=gravatar-sync
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
