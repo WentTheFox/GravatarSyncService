@@ -2,11 +2,11 @@
 Description=Sync local account picture from Gravatar
 After=network-online.target
 Wants=network-online.target
-ConditionPathExists=/etc/gravatar-sync/config.env
+ConditionPathExists=/etc/gravatar-sync/.env
 
 [Service]
 Type=oneshot
-EnvironmentFile=/etc/gravatar-sync/config.env
+EnvironmentFile=/etc/gravatar-sync/.env
 ExecStart=/usr/local/bin/gravatar-sync
 
 # Hardening. Needs root (to write AccountsService's icon dir and call it

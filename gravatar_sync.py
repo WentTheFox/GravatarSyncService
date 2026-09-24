@@ -2,7 +2,7 @@
 """Sync a local Linux account's picture from its Gravatar image.
 
 All configuration comes from environment variables (see
-config.env.example) so nothing user-specific is hardcoded:
+.env.example) so nothing user-specific is hardcoded:
 
     GRAVATAR_SYNC_EMAIL      Email address whose Gravatar to fetch (required)
     GRAVATAR_SYNC_USER       Local username to update (required)

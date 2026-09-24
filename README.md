@@ -40,7 +40,7 @@ this runs as a system service rather than a user one.
 
 ```sh
 sudo ./install.sh
-sudo "$EDITOR" /etc/gravatar-sync/config.env   # set your email + username
+sudo "$EDITOR" /etc/gravatar-sync/.env   # set your email + username
 sudo systemctl enable --now gravatar-sync.timer
 ```
 
@@ -59,15 +59,15 @@ If you'd rather not run `install.sh`:
 sudo install -Dm755 gravatar_sync.py /usr/local/bin/gravatar-sync
 sudo install -Dm644 systemd/gravatar-sync.service /etc/systemd/system/
 sudo install -Dm644 systemd/gravatar-sync.timer /etc/systemd/system/
-sudo install -Dm600 config.env.example /etc/gravatar-sync/config.env
-# edit /etc/gravatar-sync/config.env, then:
+sudo install -Dm600 .env.example /etc/gravatar-sync/.env
+# edit /etc/gravatar-sync/.env, then:
 sudo systemctl daemon-reload
 sudo systemctl enable --now gravatar-sync.timer
 ```
 
 ## Configuration
 
-Set in `/etc/gravatar-sync/config.env` (see `config.env.example`):
+Set in `/etc/gravatar-sync/.env` (see `.env.example`):
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
